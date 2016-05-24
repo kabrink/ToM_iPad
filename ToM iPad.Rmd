@@ -1,0 +1,92 @@
+---
+title: "ToM iPad"
+author: "Kimberly A. Brink"
+date: "March 25, 2016"
+output: html_document
+---
+
+
+```{r install_libraries}
+library(lubridate)
+library(Hmisc)
+```
+
+```{r standard_error}
+s.error <- function(x) sd(x)/sqrt(length(x))
+```
+
+```{r load_file}
+filename="/Volumes/lsa-research01/ALL STUDIES/Current Studies/ToM iPad/ToM iPad.sav"
+ToM <- spss.get(filename,datevars=c("DOB","DOT"))
+```
+
+```{r calculate_variables}
+ToM$Age = (year(as.period(new_interval(ToM$DOB, ToM$DOT)))*12) + month(as.period(new_interval(ToM$DOB, ToM$DOT))) + (day(as.period(new_interval(ToM$DOB, ToM$DOT)))/30)
+ToM$AgeYears = ToM$Age/12
+```
+
+###Demographics.
+There were `r length(ToM$SubID)` participants.
+
+```{r hist_age}
+hist(ToM$Age)
+```
+
+```{r compute_scores}
+ToM$DD.score = ifelse(ToM$DD1!=ToM$DD2,1,0) 
+ToM$DB.score = ifelse(ToM$DB1!=ToM$DB2,1,0)
+ToM$KA.score = ifelse(ToM$KA3=="No"&ToM$KA4=="No",1,0)
+ToM$CFB.score = ifelse(ToM$CFB3=="Band-aids"&ToM$CFB4=="No",1,0)
+ToM$HE.score = ifelse((ToM$HE3=="Sad"&ToM$HE4=="Happy")|(ToM$HE3=="Sad"&ToM$HE4=="OK")|(ToM$HE3=="OK"&ToM$HE4=="Happy"),1,0)
+ToM$scale.score = ToM$DD.score + ToM$DB.score + ToM$KA.score + ToM$CFB.score + ToM$HE.score
+#Professional voices.
+
+ToM = ToM[ToM$SubID > 12,]
+
+```
+
+```{r}
+mean(ToM$DD.score,na.rm=T)
+mean(ToM$DB.score,na.rm=T)
+mean(ToM$KA.score,na.rm=T)
+mean(ToM$CFB.score,na.rm=T)
+mean(ToM$HE.score,na.rm=T)
+plot(ToM$Age,ToM$scale.score)
+cor.test(ToM$Age,ToM$scale.score)
+```
+
+```{r IITA}
+
+library(DAKS)
+ToM.scale = ToM[,c('DD.score','DB.score','KA.score','CFB.score','HE.score')]
+ToM.scale = ToM.scale[complete.cases(ToM.scale),]
+
+#10 largest response patterns in the data:
+pat = pattern(ToM.scale)
+pat
+sum(pat$response.patterns)
+sum(pat$response.patterns)/length(ToM.scale$DD.score)
+
+apply(ToM.scale, 2, table)[2,]
+
+mini <- iita(ToM.scale, v = 1)
+corr <- iita(ToM.scale, v = 2)
+orig <- iita(ToM.scale, v = 3)
+
+summary(mini)
+summary(corr)
+summary(orig)
+
+#We additionally present the inductively generated selection set of competing quasi orders, because that helps investigating the results obtained from applying the IITA algorithms
+sel_set <- ind_gen(ob_counter(ToM.scale))
+sel_set
+```
+
+```{r mRm}
+#I'm pretty sure this is what we want to do to identify multiple rasch models, but I get weird results
+library(mRm)
+mrm.mod = mrm(ToM.scale, cl=1, max.it = 10000, conv.crit = .0001)
+summary(mrm.mod)
+plot(mrm.mod)
+```
+
