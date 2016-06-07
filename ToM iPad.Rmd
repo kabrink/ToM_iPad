@@ -5,6 +5,9 @@ date: "March 25, 2016"
 output: html_document
 ---
 
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE, warning=FALSE, message=FALSE, fig.width=16)
+```
 
 ```{r install_libraries}
 library(lubridate)
@@ -21,15 +24,27 @@ ToM <- spss.get(filename,datevars=c("DOB","DOT"))
 ```
 
 ```{r calculate_variables}
-ToM$Age = (year(as.period(new_interval(ToM$DOB, ToM$DOT)))*12) + month(as.period(new_interval(ToM$DOB, ToM$DOT))) + (day(as.period(new_interval(ToM$DOB, ToM$DOT)))/30)
+ToM$Age = (year(as.period(interval(ToM$DOB, ToM$DOT)))*12) + month(as.period(interval(ToM$DOB, ToM$DOT))) + (day(as.period(interval(ToM$DOB, ToM$DOT)))/30)
 ToM$AgeYears = ToM$Age/12
 ```
 
 ###Demographics.
 There were `r length(ToM$SubID)` participants.
 
+The average age of participants was `r round(mean(ToM$Age)/12,2)` years old.
+
+The oldest participant was `r round(max(ToM$Age)/12,2)` years old.
+
+The youngest participant was `r round(min(ToM$Age)/12,2)` years old.
+
+There were `r dim(ToM[which(ToM$AgeYears>6),])[1]` participants older than 6`
+
+There were `r dim(ToM[which(ToM$AgeYears<=6),])[1]` participants younger than 6`
+
+
 ```{r hist_age}
-hist(ToM$Age)
+agehist = hist(ToM$AgeYears, breaks = 20, col = ifelse(ToM$AgeYears<=6,'red','blue'))
+text(agehist$counts)
 ```
 
 ```{r compute_scores}
@@ -53,6 +68,9 @@ mean(ToM$CFB.score,na.rm=T)
 mean(ToM$HE.score,na.rm=T)
 plot(ToM$Age,ToM$scale.score)
 cor.test(ToM$Age,ToM$scale.score)
+
+ToM.scale = ToM[,c('DD.score','DB.score','KA.score','CFB.score','HE.score')]
+apply(ToM.scale, 2, mean, na.rm=T)
 ```
 
 ```{r IITA}
