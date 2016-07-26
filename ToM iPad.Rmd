@@ -52,7 +52,7 @@ ToM$DD.score = ifelse(ToM$DD1!=ToM$DD2,1,0)
 ToM$DB.score = ifelse(ToM$DB1!=ToM$DB2,1,0)
 ToM$KA.score = ifelse(ToM$KA3=="No"&ToM$KA4=="No",1,0)
 ToM$CFB.score = ifelse(ToM$CFB3=="Band-aids"&ToM$CFB4=="No",1,0)
-ToM$HE.score = ifelse((ToM$HE3=="Sad"&ToM$HE4=="Happy")|(ToM$HE3=="Sad"&ToM$HE4=="OK")|(ToM$HE3=="OK"&ToM$HE4=="Happy"),1,0)
+ToM$HE.score = ifelse((ToM$HE3=="Sad"&ToM$HE4=="Happy"&ToM$HE5cor==1)|(ToM$HE3=="Sad"&ToM$HE4=="OK"&ToM$HE5cor==1)|(ToM$HE3=="OK"&ToM$HE4=="Happy"&ToM$HE5cor==1),1,0)
 ToM$scale.score = ToM$DD.score + ToM$DB.score + ToM$KA.score + ToM$CFB.score + ToM$HE.score
 #Professional voices.
 
@@ -61,50 +61,85 @@ ToM = ToM[ToM$SubID > 12,]
 ```
 
 ```{r}
-mean(ToM$DD.score,na.rm=T)
-mean(ToM$DB.score,na.rm=T)
-mean(ToM$KA.score,na.rm=T)
-mean(ToM$CFB.score,na.rm=T)
-mean(ToM$HE.score,na.rm=T)
-plot(ToM$Age,ToM$scale.score)
-cor.test(ToM$Age,ToM$scale.score)
-
 ToM.scale = ToM[,c('DD.score','DB.score','KA.score','CFB.score','HE.score')]
 apply(ToM.scale, 2, mean, na.rm=T)
+
+plot(ToM$Age,ToM$scale.score)
+cor.test(ToM$Age,ToM$scale.score)
 ```
 
-```{r IITA}
-
-library(DAKS)
-ToM.scale = ToM[,c('DD.score','DB.score','KA.score','CFB.score','HE.score')]
-ToM.scale = ToM.scale[complete.cases(ToM.scale),]
-
-#10 largest response patterns in the data:
-pat = pattern(ToM.scale)
-pat
-sum(pat$response.patterns)
-sum(pat$response.patterns)/length(ToM.scale$DD.score)
-
-apply(ToM.scale, 2, table)[2,]
-
-mini <- iita(ToM.scale, v = 1)
-corr <- iita(ToM.scale, v = 2)
-orig <- iita(ToM.scale, v = 3)
-
-summary(mini)
-summary(corr)
-summary(orig)
-
-#We additionally present the inductively generated selection set of competing quasi orders, because that helps investigating the results obtained from applying the IITA algorithms
-sel_set <- ind_gen(ob_counter(ToM.scale))
-sel_set
+```{r mixRasch}
+#pretty much only gives me results for one type of rasch model
+#gives results for rasch table
+library(mixRasch)
+mr.mod = mixRasch(ToM.scale, steps = 1, max.iter = 1000000, conv.crit = 0.00001, model = "PCM", n.c = 1)
+mr.mod
 ```
 
-```{r mRm}
-#I'm pretty sure this is what we want to do to identify multiple rasch models, but I get weird results
-library(mRm)
-mrm.mod = mrm(ToM.scale, cl=1, max.it = 10000, conv.crit = .0001)
-summary(mrm.mod)
-plot(mrm.mod)
+```{r guttman_analysis}
+#perform guttman analysis (by hand)
+library(sirt)
+
+gutt.mod = prob.guttman(ToM.scale)
+summary(gutt.mod)
+
+#green's coefficient of reproducibility (1956)
+
+#sum the number respondents with positive responses for each item
+apply(ToM.scale, 2, sum, na.rm=T)
+
+#sum the number of respondents who got g correct
+g_11 = sum(ToM.scale$DD.score,na.rm=T)
+g_12 = sum(ToM.scale$DB.score,na.rm=T)
+g_13 = sum(ToM.scale$KA.score,na.rm=T)
+g_14 = sum(ToM.scale$CFB.score,na.rm=T)
+g_15 = sum(ToM.scale$HE.score,na.rm=T)
+
+#sum the number of respondents who got g incorrect
+g_01 = sum(ifelse(ToM.scale$DD.score==0,1,0),na.rm=T)
+g_02 = sum(ifelse(ToM.scale$DB.score==0,1,0),na.rm=T)
+g_03 = sum(ifelse(ToM.scale$KA.score==0,1,0),na.rm=T)
+g_04 = sum(ifelse(ToM.scale$CFB.score==0,1,0),na.rm=T)
+g_05 = sum(ifelse(ToM.scale$HE.score==0,1,0),na.rm=T)
+
+#sum the number of respondents who got item g+1 correct and g incorrect, where g = 1,...,k-1
+g_12_01 = sum(ifelse(ToM.scale$DB.score==1&ToM.scale$DD.score==0,1,0),na.rm=T)
+g_13_02 = sum(ifelse(ToM.scale$KA.score==1&ToM.scale$DB.score==0,1,0),na.rm=T)
+g_14_03 = sum(ifelse(ToM.scale$CFB.score==1&ToM.scale$KA.score==0,1,0),na.rm=T)
+g_15_04 = sum(ifelse(ToM.scale$HE.score==1&ToM.scale$CFB.score==0,1,0),na.rm=T)
+
+#sum the number of respondents who got items g+2 and g+1 correct and items g and g-1 incorrect
+g_143_021 = sum(ifelse(ToM.scale$CFB.score==1&ToM.scale$KA.score==1&ToM.scale$DB.score==0&ToM.scale$DD.score==0,1,0),na.rm=T)
+g_154_032 = sum(ifelse(ToM.scale$HE.score==1&ToM.scale$CFB.score==1&ToM.scale$KA.score==0&ToM.scale$DB.score==0,1,0),na.rm=T)
+
+#sum the number of respondents who got item g+2 correct and g incorrect, where g = 2,...,k-2
+g_13_01 = sum(ifelse(ToM.scale$KA.score==1&ToM.scale$DD.score==0,1,0),na.rm=T)
+g_14_02 = sum(ifelse(ToM.scale$CFB.score==1&ToM.scale$DB.score==0,1,0),na.rm=T)
+g_15_03 = sum(ifelse(ToM.scale$HE.score==1&ToM.scale$KA.score==0,1,0),na.rm=T)
+
+Rep_A = 1 - (1/(dim(ToM.scale)[1]*dim(ToM.scale)[2]))*(g_12_01+g_13_02+g_14_03+g_15_04) - (1/(dim(ToM.scale)[1]*dim(ToM.scale)[2]))*(g_143_021*g_154_032)
+
+Rep_B = 1 - (1/(dim(ToM.scale)[1]*dim(ToM.scale)[2]))*(g_12_01+g_13_02+g_14_03+g_15_04) - (1/((dim(ToM.scale)[1]^2)*dim(ToM.scale)[2]))*((g_14_02*g_13_01)+(g_15_03*g_14_02))
+
+se.Rep_A = sqrt(((1-Rep_A)*(Rep_A))/(dim(ToM.scale)[1]*dim(ToM.scale)[2]))
+se.Rep_B = sqrt(((1-Rep_B)*(Rep_B))/(dim(ToM.scale)[1]*dim(ToM.scale)[2]))
+
+#green's index of consistency
+
+Rep_I = 1 - (1/((dim(ToM.scale)[1]^2)*dim(ToM.scale)[2]))*((g_12*g_01)+(g_13*g_02)+(g_14*g_03)+(g_15*g_04)) - (1/((dim(ToM.scale)[1]^4)*dim(ToM.scale)[2]))*((g_14*g_13*g_02*g_01)+(g_15*g_14*g_03*g_02))
+
+I_A = (Rep_B-Rep_I)/(1-Rep_I)
+I_B = (Rep_A-Rep_I)/(1-Rep_I)
+
+#green's coefficient of reproducibility (1956)
+Rep_A
+Rep_B
+
+#green's coefficient of reproducibility (1956) by chance
+Rep_I
+
+#green's index of consistency, should be greater than .5
+I_A
+I_B
 ```
 
